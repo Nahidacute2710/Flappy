@@ -1,0 +1,144 @@
+{
+  "timestamp": "2026-10-27T20:22:46+07:00",
+  "api_base": "http://localhost:3000",
+  "results": [
+    {
+      "test": "Simulation",
+      "count": 100,
+      "repetitions": 5,
+      "sequential_median_ms": 15.92,
+      "parallel_median_ms": 7.707,
+      "speedup": 2.066,
+      "all_results_match": true,
+      "sequential_times_ms": [
+        30.015,
+        4.309,
+        44.041,
+        15.92,
+        7.473
+      ],
+      "parallel_times_ms": [
+        14.934,
+        11.285,
+        7.707,
+        2.885,
+        4.99
+      ]
+    },
+    {
+      "test": "Simulation",
+      "count": 300,
+      "repetitions": 5,
+      "sequential_median_ms": 25.217,
+      "parallel_median_ms": 8.109,
+      "speedup": 3.11,
+      "all_results_match": true,
+      "sequential_times_ms": [
+        12.839,
+        26.442,
+        25.217,
+        28.821,
+        24.508
+      ],
+      "parallel_times_ms": [
+        6.915,
+        5.204,
+        12.14,
+        12.015,
+        8.109
+      ]
+    },
+    {
+      "test": "Simulation",
+      "count": 1000,
+      "repetitions": 5,
+      "sequential_median_ms": 51.775,
+      "parallel_median_ms": 14.665,
+      "speedup": 3.531,
+      "all_results_match": true,
+      "sequential_times_ms": [
+        55.803,
+        67.139,
+        51.775,
+        41.591,
+        40.329
+      ],
+      "parallel_times_ms": [
+        16.694,
+        14.665,
+        11.414,
+        13.057,
+        15.499
+      ]
+    },
+    {
+      "test": "Boss",
+      "count": 100,
+      "repetitions": 5,
+      "sequential_median_ms": 20.294,
+      "parallel_median_ms": 11.145,
+      "speedup": 1.821,
+      "all_results_match": true,
+      "sequential_times_ms": [
+        21.244,
+        20.294,
+        19.221,
+        20.208,
+        21.551
+      ],
+      "parallel_times_ms": [
+        11.145,
+        10.398,
+        8.382,
+        11.41,
+        11.448
+      ]
+    },
+    {
+      "test": "Boss",
+      "count": 300,
+      "repetitions": 5,
+      "sequential_median_ms": 56.916,
+      "parallel_median_ms": 24.575,
+      "speedup": 2.316,
+      "all_results_match": true,
+      "sequential_times_ms": [
+        62.424,
+        60.42,
+        55.016,
+        56.916,
+        54.448
+      ],
+      "parallel_times_ms": [
+        37.07,
+        35.47,
+        22.737,
+        22.465,
+        24.575
+      ]
+    },
+    {
+      "test": "Boss",
+      "count": 1000,
+      "repetitions": 5,
+      "sequential_median_ms": 176.878,
+      "parallel_median_ms": 69.605,
+      "speedup": 2.541,
+      "all_results_match": true,
+      "sequential_times_ms": [
+        188.425,
+        180.035,
+        176.878,
+        175.415,
+        172.737
+      ],
+      "parallel_times_ms": [
+        69.587,
+        72.67,
+        69.583,
+        74.404,
+        69.605
+      ]
+    }
+  ]
+}

@@ -1,0 +1,672 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#08091c">
+  <title>Cyber Flappy — Haskell Edition</title>
+  <link rel="stylesheet" href="interf.css">
+</head>
+<body>
+  <div class="ambient ambient-one"></div>
+  <div class="ambient ambient-two"></div>
+  <main class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="#" aria-label="Cyber Flappy trang chủ">
+        <span class="brand-icon">✦</span>
+        <span class="brand-copy">
+          <small>FUNCTIONAL PROGRAMMING PROJECT</small>
+          <strong>Flappy <em> Cute</em></strong>
+        </span>
+      </a>
+      <div class="api-pill" id="apiStatus"><span class="status-light"></span><span>Đang kết nối Haskell API...</span></div>
+      
+      <div class="topbar-actions">
+        <button
+          class="achievement-open-button"
+          id="achievementOpenButton"
+          type="button">
+          <span>✦</span> ACHIEVEMENTS
+        </button>
+
+        <button
+          class="leaderboard-open-button"
+          id="leaderboardOpenButton"
+          type="button">
+          <span>▤</span> LEADERBOARD
+        </button>
+
+        <button
+          class="shop-open-button"
+          id="shopOpenButton"
+          type="button">
+          <span>✦</span> SHOP
+        </button>
+      </div>
+
+
+    </header>
+
+    <section class="hero">
+    <div class="hero-copy">
+      <p class="eyebrow">
+        <span class="eyebrow-line"></span>
+        Be the sky 
+      </p>
+
+      <h1>
+        Bay đi <br>
+        <span>chờ chiiiii !!!</span>
+      </h1>
+
+      <p class="hero-description">
+        Đập cánh liền tay, thử sức game hayyyy!!!.
+        Hãy tích lũy điểm số và phá kỷ lục của chính bạn.
+      </p>
+
+      <div class="feature-chips">
+        <span>✦ NEON WORLD</span>
+        <span>λ HASKELL CORE</span>
+        <span>◉ REAL-TIME</span>
+      </div>
+    </div>
+      <div class="hero-orb" aria-hidden="true"><div class="orb-ring ring-a"></div><div class="orb-ring ring-b"></div><div class="orb-core">✦</div></div>
+    </section>
+
+    <section class="game-layout">
+      <div class="game-panel">
+        <div class="panel-topline"><span><i class="live-dot"></i> LIVE SIMULATION</span><span class="system-code">SYS // FLAPPY-01</span></div>
+        <div class="game-hud">
+          <div class="score-box"><small>YOUR SCORE</small><strong id="scoreValue">000</strong></div>
+          <div class="state-box"><small>GAME STATE</small><strong id="gameState">READY</strong></div>
+          <button class="sound-button" id="soundButton" type="button" aria-label="Bật hoặc tắt âm thanh" title="Bật/tắt âm thanh">♫</button>
+        </div>
+        <div class="canvas-frame" id="canvasFrame">
+          <canvas id="gameCanvas" width="800" height="600" aria-label="Trò chơi Cyber Flappy Bird"></canvas>
+          <div class="scanlines" aria-hidden="true"></div>
+          <div class="overlay" id="overlay">
+            <div class="overlay-card">
+              <div class="overlay-symbol" id="overlaySymbol">✦</div>
+              <p class="overlay-kicker" id="overlayKicker">READY PLAYER ONE</p>
+              <h2 id="overlayTitle">Cyber Flappy</h2>
+              <p id="overlayText">Nhấn bắt đầu, sau đó click hoặc nhấn Space để vỗ cánh.</p>
+              <button class="primary-button" id="playButton" type="button"><span id="playButtonText">BẮT ĐẦU CHƠI</span><span class="button-arrow">↗</span></button>
+            </div>
+          </div>
+          <div class="click-hint" id="clickHint">CLICK TO FLAP <span>⌁</span></div>
+        </div>
+        <div class="game-footer"><span><kbd>SPACE</kbd> / <kbd>↑</kbd> VỖ CÁNH</span><span>CLICK / TAP ĐỂ BAY</span></div>
+      </div>
+      
+      <!-- LIQUID GLASS CONTROL PANEL -->
+      <aside class="glass-control-panel" id="glassControlPanel">
+          <div class="glass-panel-header">
+              <div class="glass-status-dot"></div>
+              <span>SYSTEM CONTROL</span>
+              <span class="glass-version">CF / 01</span>
+          </div>
+
+          <!-- DATE & TIME -->
+          <section class="glass-clock-section">
+              <div class="glass-date-label">CURRENT LOCAL TIME</div>
+              <div class="glass-clock" id="glassClock">00:00:00</div>
+              <div class="glass-date" id="glassDate">Loading date...</div>
+          </section>
+
+          <div class="glass-divider"></div>
+
+          <!-- VOLUME -->
+          <section class="glass-volume-section">
+              <div class="glass-volume-heading">
+                  <div class="glass-volume-label">
+                      <span id="glassVolumeIcon">♫</span>
+                      <span>MASTER VOLUME</span>
+                  </div>
+                  <span class="glass-volume-value" id="glassVolumeValue">60%</span>
+              </div>
+
+              <div class="glass-volume-controls">
+                  <button
+                      type="button"
+                      class="glass-mute-button"
+                      id="glassMuteButton"
+                      aria-label="Bật hoặc tắt tiếng"
+                      title="Bật/tắt tiếng"
+                  >♫</button>
+
+                  <input
+                      type="range"
+                      id="glassVolumeSlider"
+                      min="0"
+                      max="100"
+                      value="60"
+                      aria-label="Điều chỉnh âm lượng"
+                  >
+              </div>
+
+              <div class="glass-volume-scale">
+                  <span>MUTE</span>
+                  <span>MAX</span>
+              </div>
+          </section>
+
+          <div class="glass-panel-footer">
+              <span>● SYSTEM ONLINE</span>
+              <span id="glassPanelStatus">AUDIO READY</span>
+          </div>
+      </aside>
+
+      <aside class="side-column">
+        <section class="info-card score-card">
+          <div class="card-heading"><span class="card-icon">◈</span><div><small>SESSION DATA</small><h2>Flight status</h2></div></div>
+          <div class="metric-row"><span>Game ticks</span><strong id="tickValue">0</strong></div>
+          <div class="metric-row"><span>Trạng thái</span><strong id="statusValue">Ready</strong></div>
+          <div class="metric-row"><span>Điểm cao nhất</span><strong id="bestValue">0</strong></div>
+          <div class="progress-track"><span id="scoreProgress"></span></div>
+          <p class="micro-copy" id="messageText">Đang kiểm tra kết nối tới Haskell API.</p>
+          <button class="secondary-button" id="restartButton" type="button"><span>↻</span> RESET RUN</button>
+        </section>
+        <section class="info-card controls-card">
+          <div class="card-heading"><span class="card-icon pink">⌘</span><div><small>QUICK GUIDE</small><h2>Điều khiển</h2></div></div>
+          <div class="control-item"><kbd>SPACE</kbd><span>Vỗ cánh / bắt đầu</span></div>
+          <div class="control-item"><kbd>↑</kbd><span>Bay lên</span></div>
+          <div class="control-item"><kbd>CLICK</kbd><span>Vỗ cánh + hiệu ứng neon</span></div>
+          <div class="control-item"><kbd>ESC</kbd><span>Tạm dừng</span></div>
+        </section>
+        <section class="architecture-card">
+          <div class="architecture-title"><span class="pulse-ring">λ</span><div><small>POWERED BY</small><strong>FUNCTIONAL CORE</strong></div></div>
+          <div class="stack-line"><span class="stack-dot js"></span><span>Frontend</span><b>Canvas + JS</b></div>
+          <div class="stack-line"><span class="stack-dot hs"></span><span>Backend</span><b>Haskell API</b></div>
+          <div class="stack-line"><span class="stack-dot json"></span><span>Protocol</span><b>REST / JSON</b></div>
+        </section>
+      </aside>
+    </section>
+    <footer class="page-footer"><span>CYBER FLAPPY</span><span>BUILT FOR FUNCTIONAL PROGRAMMING</span><span>V. 1.0.0</span></footer>
+    <!-- SHOP MODAL -->
+    <section class="shop-modal hidden" id="shopModal"
+          role="dialog" aria-modal="true"
+          aria-labelledby="shopTitle">
+
+  <div class="shop-panel">
+    <header class="shop-header">
+      <div>
+        <p class="shop-eyebrow">CYBER FLAPPY // ITEM STORE</p>
+        <h2 id="shopTitle">NEON SHOP</h2>
+      </div>
+
+      <div class="shop-wallet">
+        <span>🪙</span>
+        <strong id="shopCoins">500</strong>
+      </div>
+
+      <button class="shop-close-button" id="shopCloseButton"
+              type="button" aria-label="Đóng Shop">×</button>
+    </header>
+
+    <nav class="shop-tabs" aria-label="Danh mục Shop">
+      <button class="shop-tab active" type="button"
+              data-category="all">TẤT CẢ</button>
+      <button class="shop-tab" type="button"
+              data-category="bird">SKIN CHIM</button>
+      <button class="shop-tab" type="button"
+              data-category="effect">HIỆU ỨNG</button>
+      <button class="shop-tab" type="button"
+              data-category="background">BACKGROUND</button>
+    </nav>
+
+    <div class="shop-grid" id="shopGrid">
+      <!-- JavaScript sẽ tạo các thẻ vật phẩm tại đây -->
+    </div>
+
+    <p class="shop-message" id="shopMessage"
+       aria-live="polite">Chọn vật phẩm để xem chi tiết.</p>
+  </div>
+</section>
+<!-- END SHOP MODAL -->
+
+
+<!-- LEADERBOARD MODAL -->
+<section
+  class="leaderboard-overlay"
+  id="leaderboardModal"
+  aria-hidden="true">
+
+  <div
+    class="leaderboard-panel"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="leaderboardTitle">
+
+    <header class="leaderboard-header">
+      <div class="leaderboard-brand-mark">✦</div>
+
+      <div class="leaderboard-heading">
+        <p class="leaderboard-eyebrow">
+          CYBER FLAPPY - ARCADE RECORDS
+        </p>
+        <h2 id="leaderboardTitle">
+          RANKING - <span>- DONATION</span>
+        </h2>
+        <p class="leaderboard-subtitle">
+          Break your limits. Own the skyline.
+        </p>
+      </div>
+
+      <div class="leaderboard-live">
+        <span></span> LOCAL PLAYER
+      </div>
+
+      <button
+        class="leaderboard-close"
+        id="leaderboardCloseButton"
+        type="button"
+        aria-label="Đóng bảng xếp hạng">×</button>
+    </header>
+
+    <nav class="leaderboard-period-tabs">
+      <button class="leaderboard-period active"
+        type="button" data-period="all">ALL TIME</button>
+      <button class="leaderboard-period"
+        type="button" data-period="month">MONTH</button>
+      <button class="leaderboard-period"
+        type="button" data-period="year">YEAR</button>
+
+      <div class="leaderboard-date-fields">
+        <select id="leaderboardMonth" aria-label="Chọn tháng">
+          <option value="1">Tháng 1</option>
+          <option value="2">Tháng 2</option>
+          <option value="3">Tháng 3</option>
+          <option value="4">Tháng 4</option>
+          <option value="5">Tháng 5</option>
+          <option value="6">Tháng 6</option>
+          <option value="7">Tháng 7</option>
+          <option value="8">Tháng 8</option>
+          <option value="9">Tháng 9</option>
+          <option value="10">Tháng 10</option>
+          <option value="11">Tháng 11</option>
+          <option value="12">Tháng 12</option>
+        </select>
+        <select id="leaderboardYear" aria-label="Chọn năm"></select>
+      </div>
+    </nav>
+
+    <nav class="leaderboard-kind-tabs">
+      <button class="leaderboard-kind active"
+        type="button" data-kind="scores">
+        🏆 BEST SCORES <span>Điểm cao nhất</span>
+      </button>
+      <button class="leaderboard-kind"
+        type="button" data-kind="donations">
+        ✦ DONATIONS <span>Ủng hộ game</span>
+      </button>
+    </nav>
+
+    <div class="leaderboard-summary" id="leaderboardSummary">
+      <div>
+        <span>YOUR BEST</span>
+        <strong id="leaderboardPersonalBest">042</strong>
+      </div>
+      <div>
+        <span>GAMES PLAYED</span>
+        <strong id="leaderboardGamesPlayed">018</strong>
+      </div>
+      <div>
+        <span>YOUR RANK</span>
+        <strong id="leaderboardPersonalRank">#06</strong>
+      </div>
+    </div>
+
+    <div class="leaderboard-podium"
+      id="leaderboardPodium"></div>
+
+    <div class="leaderboard-list-head" id="leaderboardListHead">
+      <span>RANK / PLAYER</span>
+      <span>DATE &amp; TIME</span>
+      <span>SCORE</span>
+    </div>
+
+    <div class="leaderboard-list"
+      id="leaderboardList"></div>
+
+    <p class="leaderboard-note" id="leaderboardNote">
+      DỮ LIỆU MINH HỌA · Chưa kết nối Haskell API
+    </p>
+
+    <footer class="leaderboard-footer">
+      <span>✦ CYBER FLAPPY</span>
+      <span>ONE PLAYER · LOCAL RECORDS</span>
+      <span>NEVER STOP FLYING</span>
+    </footer>
+  </div>
+</section>
+<!-- END LEADERBOARD MODAL -->
+
+
+<!-- ACHIEVEMENT MODAL -->
+<section class="achievement-overlay"
+         id="achievementModal"
+         aria-hidden="true">
+
+  <div class="achievement-panel"
+       role="dialog"
+       aria-modal="true"
+       aria-labelledby="achievementTitle">
+
+    <header class="achievement-header">
+      <div>
+        <p class="achievement-eyebrow">CYBER FLAPPY // PLAYER RECORD</p>
+        <h2 id="achievementTitle">
+          Chinh phục <span> thật nhiều nhé!! </span>
+        </h2>
+        <p class="achievement-subtitle">
+          Fly further. Break limits. Become legendary.
+        </p>
+      </div>
+
+      <button class="achievement-close"
+              id="achievementCloseButton"
+              type="button"
+              aria-label="Đóng bảng thành tích">×</button>
+    </header>
+
+    <div class="achievement-layout">
+
+      <!-- TIẾN TRÌNH -->
+      <aside class="achievement-progress">
+        <p class="achievement-label">PLAYER PROGRESS</p>
+        <h3>Tiến trình thành tích</h3>
+
+        <div class="achievement-total">
+          <strong id="achievementUnlockedCount">0</strong>
+          <span>/ 12</span>
+        </div>
+
+        <p class="achievement-muted">Huy hiệu đã mở khóa</p>
+
+        <div class="achievement-track">
+          <span id="achievementOverallBar" style="width: 0%"></span>
+        </div>
+
+        <p class="achievement-muted">
+          Dữ liệu minh họa — chưa kết nối backend.
+        </p>
+      </aside>
+
+      <!-- DANH HIỆU -->
+      <section class="achievement-list">
+        <div class="achievement-section-heading">
+          <div>
+            <p class="achievement-label">YOUR MILESTONES</p>
+            <h3>Bộ sưu tập huy hiệu</h3>
+          </div>
+          <span class="achievement-count">12 BADGES</span>
+        </div>
+
+        <div class="achievement-grid" id="achievementGrid">
+
+          <article class="achievement-card"
+                   data-name="Fan Cứng"
+                   data-requirement="Chơi tổng cộng 100 trận."
+                   data-progress="42"
+                   data-target="100"
+                   data-unit="trận"
+                   data-icon="★"
+                   data-color="cyan">
+            <div class="achievement-icon">★</div>
+            <span class="achievement-state">CHƯA MỞ KHÓA</span>
+            <h4>Fan Cứng</h4>
+            <p>VIP - Very important person</p>
+            <div class="achievement-card-progress">
+              <span>42 / 100 trận</span><strong>42%</strong>
+            </div>
+            <div class="achievement-card-track">
+              <span style="width: 42%"></span>
+            </div>
+          </article>
+
+          <article class="achievement-card"
+                   data-name="Bá Vương"
+                   data-requirement="Đạt ít nhất 10 điểm và hoàn thành 10 trận liên tiếp."
+                   data-progress="6"
+                   data-target="10"
+                   data-unit="trận"
+                   data-icon="♛"
+                   data-color="gold">
+            <div class="achievement-icon">♛</div>
+            <span class="achievement-state">CHƯA MỞ KHÓA</span>
+            <h4>Bá Vương</h4>
+            <p>KING OF FLAPPY</p>
+            <div class="achievement-card-progress">
+              <span>6 / 10 trận</span><strong>60%</strong>
+            </div>
+            <div class="achievement-card-track">
+              <span style="width: 60%"></span>
+            </div>
+          </article>
+
+          <article class="achievement-card"
+                   data-name="Bá Đạo"
+                   data-requirement="Đạt 50 điểm trong một trận."
+                   data-progress="18"
+                   data-target="50"
+                   data-unit="điểm"
+                   data-icon="ϟ"
+                   data-color="purple">
+            <div class="achievement-icon">ϟ</div>
+            <span class="achievement-state">CHƯA MỞ KHÓA</span>
+            <h4>Bá Đạo</h4>
+            <p>UNSTOPPABLE</p>
+            <div class="achievement-card-progress">
+              <span>18 / 50 điểm</span><strong>36%</strong>
+            </div>
+            <div class="achievement-card-track">
+              <span style="width: 36%"></span>
+            </div>
+          </article>
+
+          <article class="achievement-card"
+                   data-name="Unbelievable"
+                   data-requirement="Đạt 100 điểm trong một trận."
+                   data-progress="32"
+                   data-target="100"
+                   data-unit="điểm"
+                   data-icon="◈"
+                   data-color="blue">
+            <div class="achievement-icon">◈</div>
+            <span class="achievement-state">CHƯA MỞ KHÓA</span>
+            <h4>Unbelievable</h4>
+            <p>BEYOND LIMITS</p>
+            <div class="achievement-card-progress">
+              <span>32 / 100 điểm</span><strong>32%</strong>
+            </div>
+            <div class="achievement-card-track">
+              <span style="width: 32%"></span>
+            </div>
+          </article>
+
+          <article class="achievement-card locked"
+                   data-name="Siêu Nhân"
+                   data-requirement="Đạt 20 điểm trong một trận."
+                   data-progress="0"
+                   data-target="20"
+                   data-unit="điểm"
+                   data-icon="➤"
+                   data-color="cyan">
+            <div class="achievement-icon">➤</div>
+            <span class="achievement-state">🔒 LOCKED</span>
+            <h4>Siêu Nhân</h4>
+            <p>SUPER FLIGHT</p>
+            <div class="achievement-card-progress">
+              <span>0 / 20 điểm</span><strong>0%</strong>
+            </div>
+            <div class="achievement-card-track">
+              <span style="width: 0%"></span>
+            </div>
+          </article>
+
+          <article class="achievement-card locked"
+                   data-name="Chiến Binh"
+                   data-requirement="Hoàn thành 25 trận."
+                   data-progress="0"
+                   data-target="25"
+                   data-unit="trận"
+                   data-icon="⚔"
+                   data-color="purple">
+            <div class="achievement-icon">⚔</div>
+            <span class="achievement-state">🔒 LOCKED</span>
+            <h4>Chiến Binh</h4>
+            <p>WARRIOR</p>
+            <div class="achievement-card-progress">
+              <span>0 / 25 trận</span><strong>0%</strong>
+            </div>
+            <div class="achievement-card-track">
+              <span style="width: 0%"></span>
+            </div>
+          </article>
+
+          <article class="achievement-card locked"
+                   data-name="Thần Tốc"
+                   data-requirement="Vượt qua 20 chướng ngại vật trong một trận."
+                   data-progress="0"
+                   data-target="20"
+                   data-unit="chướng ngại vật"
+                   data-icon="ϟ"
+                   data-color="gold">
+            <div class="achievement-icon">ϟ</div>
+            <span class="achievement-state">🔒 LOCKED</span>
+            <h4>Thần Tốc</h4>
+            <p>SPEED DEMON</p>
+            <div class="achievement-card-progress">
+              <span>0 / 20 chướng ngại vật</span><strong>0%</strong>
+            </div>
+            <div class="achievement-card-track">
+              <span style="width: 0%"></span>
+            </div>
+          </article>
+
+          <article class="achievement-card locked"
+                   data-name="Bất Tử"
+                   data-requirement="Vượt qua 100 chướng ngại vật trong một trận."
+                   data-progress="0"
+                   data-target="100"
+                   data-unit="chướng ngại vật"
+                   data-icon="∞"
+                   data-color="blue">
+            <div class="achievement-icon">∞</div>
+            <span class="achievement-state">🔒 LOCKED</span>
+            <h4>Bất Tử</h4>
+            <p>IMMORTAL</p>
+            <div class="achievement-card-progress">
+              <span>0 / 100 chướng ngại vật</span><strong>0%</strong>
+            </div>
+            <div class="achievement-card-track">
+              <span style="width: 0%"></span>
+            </div>
+          </article>
+
+          <article class="achievement-card locked"
+                   data-name="Đặc Thù"
+                   data-requirement="Mở khóa một skin chim đặc biệt."
+                   data-progress="0"
+                   data-target="1"
+                   data-unit="skin"
+                   data-icon="✦"
+                   data-color="purple">
+            <div class="achievement-icon">✦</div>
+            <span class="achievement-state">🔒 LOCKED</span>
+            <h4>Đặc Thù</h4>
+            <p>RARE COLLECTOR</p>
+            <div class="achievement-card-progress">
+              <span>0 / 1 skin</span><strong>0%</strong>
+            </div>
+            <div class="achievement-card-track">
+              <span style="width: 0%"></span>
+            </div>
+          </article>
+
+          <article class="achievement-card locked"
+                   data-name="Huyền Thoại"
+                   data-requirement="Đạt 75 điểm trong một trận."
+                   data-progress="0"
+                   data-target="75"
+                   data-unit="điểm"
+                   data-icon="◇"
+                   data-color="gold">
+            <div class="achievement-icon">◇</div>
+            <span class="achievement-state">🔒 LOCKED</span>
+            <h4>Huyền Thoại</h4>
+            <p>LEGENDARY</p>
+            <div class="achievement-card-progress">
+              <span>0 / 75 điểm</span><strong>0%</strong>
+            </div>
+            <div class="achievement-card-track">
+              <span style="width: 0%"></span>
+            </div>
+          </article>
+
+          <article class="achievement-card locked"
+                   data-name="Thách Đấu"
+                   data-requirement="Đạt ít nhất 10 điểm trong 5 trận khác nhau."
+                   data-progress="0"
+                   data-target="5"
+                   data-unit="trận"
+                   data-icon="♛"
+                   data-color="cyan">
+            <div class="achievement-icon">♛</div>
+            <span class="achievement-state">🔒 LOCKED</span>
+            <h4>Thách Đấu</h4>
+            <p>CHALLENGER</p> 
+            <div class="achievement-card-progress">
+              <span>0 / 5 trận</span><strong>0%</strong>
+            </div>
+            <div class="achievement-card-track">
+              <span style="width: 0%"></span>
+            </div>
+          </article>
+
+          <article class="achievement-card locked"
+                   data-name="Legend"
+                   data-requirement="Mở khóa toàn bộ 11 huy hiệu còn lại."
+                   data-progress="0"
+                   data-target="11"
+                   data-unit="huy hiệu"
+                   data-icon="✧"
+                   data-color="purple">
+            <div class="achievement-icon">✧</div>
+            <span class="achievement-state">🔒 LOCKED</span>
+            <h4>Legend</h4>
+            <p>ULTIMATE PLAYER</p>
+            <div class="achievement-card-progress">
+              <span>0 / 11 huy hiệu</span><strong>0%</strong>
+            </div>
+            <div class="achievement-card-track">
+              <span style="width: 0%"></span>
+            </div>
+          </article>
+
+        </div>
+
+        <p class="achievement-detail" id="achievementDetail"
+           aria-live="polite">
+          Chọn một huy hiệu để xem điều kiện mở khóa.
+        </p>
+      </section>
+    </div>
+
+    <footer class="achievement-footer">
+      <span>✦ ACHIEVEMENT SYSTEM</span>
+      <span>CYBER FLAPPY /// PLAYER RECORD</span>
+    </footer>
+
+  </div>
+</section>
+<!-- END ACHIEVEMENT MODAL -->
+
+  </main>
+  <script src="function.js"></script>
+  <script src="achievement.js"></script>
+  <script src="Leaderboard.js"></script>
+  <script src="liquid.js"></script>
+
+</body>
+</html>
