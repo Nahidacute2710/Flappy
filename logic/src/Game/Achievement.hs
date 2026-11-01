@@ -7,20 +7,21 @@ module Achievement
   , recordFinishedGame
   ) where
 
+import Control.Exception (throwIO)
 import Data.Aeson
   ( FromJSON
   , ToJSON
-  , decode
-  , encode
+  , eitherDecodeFileStrict'
   )
-import qualified Data.ByteString.Lazy as BL
 import GHC.Generics (Generic)
 import System.Directory
   ( createDirectoryIfMissing
   , doesFileExist
   )
 
--- Thống kê tổng thể của người chơi
+import StorageFile (writeJsonAtomic)
+
+-- Thong ke tong the cua nguoi choi.
 data AchievementStats = AchievementStats
   { totalGames :: Int
   , bestScore  :: Int
@@ -30,7 +31,7 @@ data AchievementStats = AchievementStats
 instance ToJSON AchievementStats
 instance FromJSON AchievementStats
 
--- Giá trị ban đầu khi chưa chơi trận nào
+-- Trang thai ban dau khi chua co du lieu.
 emptyStats :: AchievementStats
 emptyStats = AchievementStats
   { totalGames = 0
@@ -41,7 +42,9 @@ emptyStats = AchievementStats
 statsFile :: FilePath
 statsFile = "data/achievements.json"
 
--- Đọc dữ liệu đã lưu
+-- Doc du lieu thong ke tu JSON.
+-- Neu tep chua ton tai, tra ve thong ke ban dau.
+-- Neu JSON khong hop le, bao loi thay vi xoa du lieu cu.
 getAchievementStats :: IO AchievementStats
 getAchievementStats = do
   exists <- doesFileExist statsFile
@@ -49,12 +52,18 @@ getAchievementStats = do
   if not exists
     then pure emptyStats
     else do
-      content <- BL.readFile statsFile
-      case decode content of
-        Just stats -> pure stats
-        Nothing    -> pure emptyStats
+      result <- eitherDecodeFileStrict' statsFile
 
--- Gọi đúng một lần khi một trận vừa kết thúc
+      case result of
+        Left err ->
+          throwIO $ userError $
+            "Khong the doc achievements.json: " ++ err
+
+        Right stats ->
+          pure stats
+
+-- Cap nhat thong ke khi mot van choi ket thuc.
+-- Viec dong bo giua cac request do MVar trong Main.hs xu ly.
 recordFinishedGame :: Int -> IO AchievementStats
 recordFinishedGame finalScore = do
   createDirectoryIfMissing True "data"
@@ -69,6 +78,6 @@ recordFinishedGame finalScore = do
         , totalScore = totalScore oldStats + score
         }
 
-  BL.writeFile statsFile (encode newStats)
+  writeJsonAtomic statsFile newStats
 
   pure newStats

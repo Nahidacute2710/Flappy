@@ -1,3 +1,4 @@
+
 module GameLoop
     ( timeStep
     , gravity
@@ -17,7 +18,7 @@ import Physics
 import qualified PipeSystem as PS
 import Analyzer
 import Stage (Stage(..), stageForScore)
-import System.Random (mkStdGen, randomRs)
+import System.Random (mkStdGen, randomR, randomRs)
 
 -- Game update rate: 60 updates per second.
 timeStep :: Float
@@ -38,9 +39,7 @@ initialGameState = GameState
     , gamePipes = PS.initialPipes
     , gameTraps = PS.initialTraps PS.initialPipes
     , gameCoins = []
-    , gameItems =
-        [ ItemPickup 520 280 18 WindCurse False
-        ]
+    , gameItems = []
     , gameEffects = []
     , gameParams = defaultParams
     , gameModifiers = defaultModifiers
@@ -60,18 +59,9 @@ initialGameState = GameState
     , gameImmortal = False
     }
 
--- | Hệ số tốc độ.
---
--- * baseSpeedBoost: hệ số lúc mới vào game (1.5), cũng là hệ số vật lý của CHIM
---   (trọng lực, lực vỗ cánh, tốc độ rơi) và giữ NGUYÊN ở mọi vòng, để chim
---   luôn rơi/bay đúng cảm giác lúc mới bắt đầu.
--- * speedFactor: chỉ dùng cho tốc độ cuộn của thế giới (cột, bẫy, xu, vật phẩm).
---   Mỗi 10 điểm nhân thêm speedStepRatio, nhưng không vượt maxSpeedFactor.
---   Lưu ý stage (Stage.hs) cũng đã tăng stSpeed theo mốc điểm, nên hệ số này
---   cố ý tăng nhẹ để hai lớp tăng tốc không cộng dồn thành quá nhanh.
---
--- Chỉnh độ khó ở đây: speedStepRatio (mỗi vòng nhanh thêm bao nhiêu) và
--- maxSpeedFactor (trần tốc độ cuộn).
+-- He so toc do.
+-- Toc do chim khong tang theo diem.
+-- Toc do cuon the gioi tang nhe moi 10 diem.
 baseSpeedBoost, speedStepRatio, maxSpeedFactor :: Float
 baseSpeedBoost = 1.5
 speedStepRatio = 1.05
@@ -103,7 +93,11 @@ stepGame input state
 startAndFlap :: GameState -> GameState
 startAndFlap state =
     state
-        { gameBird = flapBird (gameParams state) (gameModifiers state) (gameBird state)
+        { gameBird =
+            flapBird
+                (gameParams state)
+                (gameModifiers state)
+                (gameBird state)
         , gameStatus = Playing
         }
 
@@ -129,21 +123,21 @@ updatePlaying input state =
                 _    -> bird0
 
         slowed = any isSlowEffect (gameEffects stateWithSkill)
+
         windCurseActive =
-                    any isWindCurseEffect (gameEffects stateWithSkill)
-        
+            any isWindCurseEffect (gameEffects stateWithSkill)
+
         baseDt = timeStep * realToFrac (timeScale modifiers)
         dt = if slowed then baseDt * 0.5 else baseDt
 
-        -- dt thật dùng cho hồi chiêu/hiệu ứng; worldDt dùng cho chuyển động.
+        -- WorldDt dung cho chuyen dong the gioi.
         worldDt = dt * speedFactor (gameScore stateWithSkill)
 
-        -- Vật lý của chim luôn dùng hệ số lúc mới start, không tăng theo vòng.
+        -- Vat ly chim giu he so toc do ban dau.
         birdDt = dt * baseSpeedBoost
 
         oldTraps = gameTraps stateWithSkill
 
-        -- Chỉ tăng tốc khi hiệu ứng WindCurse còn hiệu lực.
         windMultiplier :: Float
         windMultiplier =
             if windCurseActive then 2 else 1
@@ -153,29 +147,35 @@ updatePlaying input state =
                 speedMul modifiers * realToFrac windMultiplier
             }
 
-        -- Tốc độ cuộn thế giới (đã gồm WindCurse), dùng chung cho mọi vật thể.
         scroll = PS.scrollSpeed stage movementModifiers
 
         trapsMoved =
-            PS.updateTraps worldDt params movementModifiers stage oldTraps
+            PS.updateTraps
+                worldDt params movementModifiers stage oldTraps
 
-        -- Vật lý chim (trọng lực, gió, giới hạn tốc độ) nằm trong Physics.
         bird2 = updateBird birdDt params modifiers trapsMoved bird1
         bird3 = tickBirdSkill dt bird2
 
         oldPipes = gamePipes stateWithSkill
 
         (pipes2, trapsSpawned) =
-            PS.updatePipes worldDt params movementModifiers stage
-                (gameScore stateWithSkill) oldPipes
+            PS.updatePipes
+                worldDt
+                params
+                movementModifiers
+                stage
+                (gameScore stateWithSkill)
+                oldPipes
 
         traps2 = trapsMoved ++ trapsSpawned
 
         coinsMoved =
-            moveCoinsWithSpeed worldDt scroll (gameCoins stateWithSkill)
+            moveCoinsWithSpeed
+                worldDt scroll (gameCoins stateWithSkill)
 
         itemsMoved =
-            moveItemsWithSpeed worldDt scroll (gameItems stateWithSkill)
+            moveItemsWithSpeed
+                worldDt scroll (gameItems stateWithSkill)
 
         (coinsSpawned, itemsSpawned) =
             spawnCollectiblesFromRecycledPipes
@@ -185,7 +185,7 @@ updatePlaying input state =
                 coinsMoved
                 itemsMoved
 
-        -- Hút xu: skill CoinMagnet hoặc vật phẩm Magnet đang hiệu lực.
+        -- Hut xu neu dang co hieu ung nam cham.
         magnetActive =
             any isMagnetEffect (gameEffects stateWithSkill)
                 || (birdSkill bird3 == CoinMagnet
@@ -196,9 +196,15 @@ updatePlaying input state =
                 then pullCoins worldDt bird3 coinsSpawned
                 else coinsSpawned
 
-        (coinsCollected, goldGained, diamondsGained,
-            feathersGained, combo') =
-            collectCoins bird3 coinsPulled
+        ( coinsCollected
+            , goldGained
+            , diamondsGained
+            , feathersGained
+            , combo'
+            ) =
+            collectCoins
+                bird3
+                coinsPulled
                 (gameCoinCombo stateWithSkill)
 
         (itemsCollected, pickedEffects) =
@@ -206,15 +212,18 @@ updatePlaying input state =
 
         coins3 =
             filter
-                (\c -> not (coinCollected c) && coinX c + coinRadius c > 0)
+                (\c ->
+                    not (coinCollected c)
+                        && coinX c + coinRadius c > 0)
                 coinsCollected
 
         items3 =
             filter
-                (\i -> not (itemCollected i) && itemX i + itemRadius i > 0)
+                (\i ->
+                    not (itemCollected i)
+                        && itemX i + itemRadius i > 0)
                 itemsCollected
 
-        -- Existing effects lose time; newly collected effects are added.
         effects2 =
             tickEffects dt (gameEffects stateWithSkill)
                 ++ pickedEffects
@@ -227,10 +236,12 @@ updatePlaying input state =
                 else 1
 
         score' =
-            gameScore stateWithSkill + scoreGained * scoreMultiplier
+            gameScore stateWithSkill
+                + scoreGained * scoreMultiplier
 
         goldFinal =
-            gameGold stateWithSkill + goldGained * scoreMultiplier
+            gameGold stateWithSkill
+                + goldGained * scoreMultiplier
 
         diamondsFinal =
             gameDiamonds stateWithSkill + diamondsGained
@@ -252,8 +263,6 @@ updatePlaying input state =
             , gameCoinCombo = combo'
             }
 
-        -- Khiên chỉ có hiệu lực nếu vẫn còn trong effects2.
-        -- effects2 đã trừ thời gian của khiên cũ và giữ khiên vừa nhặt.
         shieldActive =
             any isShieldEffect effects2
 
@@ -266,36 +275,43 @@ updatePlaying input state =
         wasInsidePipe =
             hitsPipes params bird0 oldPipes
 
-        -- Chế độ bất tử: bỏ qua cột và mọi bẫy (kể cả cầu lửa của boss);
-        -- chỉ chạm trần hoặc đất mới chết. Quy tắc chết nằm ở Physics.birdCollides.
+        -- Bat tu bo qua cot va bay,
+        -- nhung van chet neu cham tran hoac dat.
         immortal = gameImmortal stateWithSkill
 
         collided =
-            birdCollides params shieldActive immortal bird3
-                (gamePipes candidate) (gameTraps candidate)
+            birdCollides
+                params
+                shieldActive
+                immortal
+                bird3
+                (gamePipes candidate)
+                (gameTraps candidate)
 
         candidate' =
             if collided
                 then tryRevive candidate
                 else candidate
 
-
-        -- Khiên chỉ bị tiêu thụ sau khi chim đi qua hoàn toàn một cột.
         consumeShield =
             shieldActive
                 && shieldWasActive
                 && wasInsidePipe
                 && not hitsPipe
 
-        -- Sau khi tiêu thụ khiên, cột tiếp theo sẽ gây va chạm bình thường.
         stillShieldActive =
             shieldActive && not consumeShield
 
         birdAfter = gameBird candidate'
 
         stillCollided =
-            birdCollides params stillShieldActive immortal birdAfter
-                (gamePipes candidate') (gameTraps candidate')
+            birdCollides
+                params
+                stillShieldActive
+                immortal
+                birdAfter
+                (gamePipes candidate')
+                (gameTraps candidate')
 
         status' =
             if stillCollided then GameOver else Playing
@@ -303,7 +319,6 @@ updatePlaying input state =
         withStatus =
             candidate' { gameStatus = status' }
 
-        -- Chỉ xóa khiên một lần, sau khi đã qua hết cột.
         finalState =
             if consumeShield
                 then withStatus
@@ -314,7 +329,6 @@ updatePlaying input state =
                     }
                 else withStatus
 
-        -- Đầu vào cho hai nhánh phân tích song song (Analyzer).
         analyzerInput = AnalyzerInput
             { aiStepBird =
                 updateBird birdDt params modifiers []
@@ -323,10 +337,11 @@ updatePlaying input state =
             , aiPipesPassed = scoreGained
             }
 
-    in withDecision analyzerInput (updateBackgroundAndBoss dt finalState)
+    in withDecision
+        analyzerInput
+        (updateBackgroundAndBoss dt finalState)
 
--- | Chạy Danger Analyzer + Rage & Skill Engine song song, rồi ghi kết quả
--- (thanh nộ + cảnh báo + trạng thái skill) vào GameState để gửi qua JSON API.
+-- Hai nhanh phan tich danger va rage chay song song.
 withDecision :: AnalyzerInput -> GameState -> GameState
 withDecision ai state
     | gameStatus state == GameOver = state
@@ -341,11 +356,12 @@ isMagnetEffect :: ActiveEffect -> Bool
 isMagnetEffect (MagnetEffect t) = t > 0
 isMagnetEffect _ = False
 
--- | Kéo mọi xu trên màn hình về phía chim.
+-- Keo xu ve phia chim.
 pullCoins :: Float -> Bird -> [Coin] -> [Coin]
 pullCoins dt bird = map pull
   where
     pullSpeed = 700
+
     pull coin
         | coinCollected coin = coin
         | dist < 0.001 = coin
@@ -364,10 +380,24 @@ isWindCurseEffect :: ActiveEffect -> Bool
 isWindCurseEffect (WindCurseEffect t) = t > 0
 isWindCurseEffect _ = False
 
-
 moveCoinsWithSpeed :: Float -> Float -> [Coin] -> [Coin]
 moveCoinsWithSpeed dt speed =
-    map (\coin -> coin { coinX = coinX coin - speed * dt })
+    map
+        (\coin ->
+            coin { coinX = coinX coin - speed * dt })
+
+-- ============================================================
+-- SINH XU VA VAT PHAM
+-- ============================================================
+
+-- Moi lan cot duoc tai su dung, sinh toi da mot collectible.
+-- Xac suat:
+-- 60% xu vang
+-- 15% khien
+-- 5% WindCurse
+-- 20% khong sinh
+--
+-- Vi tri Y co dao dong de vat pham khong xep thanh cum.
 
 spawnCollectiblesFromRecycledPipes
     :: Float
@@ -376,48 +406,86 @@ spawnCollectiblesFromRecycledPipes
     -> [Coin]
     -> [ItemPickup]
     -> ([Coin], [ItemPickup])
+
 spawnCollectiblesFromRecycledPipes spacing oldPipes newPipes coins items =
-    foldl spawn (coins, items) (zip3 [0 :: Int ..] oldPipes newPipes)
+    foldl
+        spawn
+        (coins, items)
+        (zip3 [0 :: Int ..] oldPipes newPipes)
   where
-    spawn (cs, its) (_, oldPipe, newPipe)
+    spawn (cs, its) (index, oldPipe, newPipe)
         | pipeX newPipe > pipeX oldPipe + spacing * 0.5 =
             let centerY =
                     (pipeGapTop newPipe + pipeGapBottom newPipe) / 2
 
+                -- Tao seed theo lan tai su dung cot.
+                seed =
+                    round (pipeAge oldPipe * 1000)
+                    + round (pipeX newPipe * 10)
+                    + index * 104729
+
+                gen0 = mkStdGen seed
+
+                (roll, gen1) =
+                    randomR (0 :: Int, 99) gen0
+
+                (offsetY, _gen2) =
+                    randomR (-30 :: Float, 30) gen1
+
+                itemY =
+                    max 70 (min 530 (centerY + offsetY))
+
+                baseX =
+                    pipeX newPipe + pipeWidth newPipe
+
                 coin =
                     Coin
-                        (pipeX newPipe + pipeWidth newPipe + 60)
-                        (centerY - 25)
+                        (baseX + 95)
+                        itemY
                         9
                         GoldCoin
                         False
 
                 shield =
                     ItemPickup
-                        (pipeX newPipe + pipeWidth newPipe + 120)
-                        (centerY + 25)
+                        (baseX + 150)
+                        itemY
                         13
                         Shield
                         False
 
                 windCurse =
                     ItemPickup
-                        (pipeX newPipe + pipeWidth newPipe + 180)
-                        (centerY + 70)
+                        (baseX + 150)
+                        itemY
                         18
                         WindCurse
                         False
 
-                newItems = windCurse : shield : its
+            in case roll of
+                n | n < 60 ->
+                    (coin : cs, its)
 
-            in (coin : cs, newItems)
+                  | n < 75 ->
+                    (cs, shield : its)
 
-    -- Pipe chưa được tái sử dụng thì giữ nguyên collectibles.
+                  | n < 80 ->
+                    (cs, windCurse : its)
+
+                  | otherwise ->
+                    (cs, its)
+
     spawn acc _ = acc
-    
+
+-- ============================================================
+-- DI CHUYEN VA THU THAP VAT PHAM
+-- ============================================================
+
 moveItemsWithSpeed :: Float -> Float -> [ItemPickup] -> [ItemPickup]
 moveItemsWithSpeed dt speed =
-    map (\item -> item { itemX = itemX item - speed * dt })
+    map
+        (\item ->
+            item { itemX = itemX item - speed * dt })
 
 collectCoins :: Bird -> [Coin] -> Int -> ([Coin], Int, Int, Int, Int)
 collectCoins bird coins oldCombo =
@@ -436,8 +504,10 @@ collectCoins bird coins oldCombo =
             (coin : rest, gold, diamonds, feathers, count)
 
         | distanceSquared
-            (birdX bird) (birdY bird)
-            (coinX coin) (coinY coin)
+            (birdX bird)
+            (birdY bird)
+            (coinX coin)
+            (coinY coin)
             <= (birdRadius bird + coinRadius coin) ^ (2 :: Int) =
                 ( coin { coinCollected = True } : rest
                 , gold + if coinKind coin == GoldCoin then 1 else 0
@@ -453,6 +523,7 @@ collectItems
     :: Bird
     -> [ItemPickup]
     -> ([ItemPickup], [ActiveEffect])
+
 collectItems bird items =
     foldr collectOne ([], []) items
   where
@@ -461,8 +532,10 @@ collectItems bird items =
             (rest, effects)
 
         | distanceSquared
-            (birdX bird) (birdY bird)
-            (itemX item) (itemY item)
+            (birdX bird)
+            (birdY bird)
+            (itemX item)
+            (itemY item)
             <= (birdRadius bird + itemRadius item) ^ (2 :: Int) =
                 (rest, effectFor (itemKind item) ++ effects)
 
@@ -480,10 +553,10 @@ collectItems bird items =
 
     effectFor DoubleReward =
         [DoubleRewardEffect 5]
-    
+
     effectFor WindCurse =
         [WindCurseEffect 2]
-    
+
     effectFor Bomb = []
     effectFor ExtraLife = []
 
@@ -491,12 +564,16 @@ distanceSquared :: Float -> Float -> Float -> Float -> Float
 distanceSquared x1 y1 x2 y2 =
     (x1 - x2) ^ 2 + (y1 - y2) ^ 2
 
+-- ============================================================
+-- KY NANG
+-- ============================================================
+
 activateSkill :: Int -> GameState -> GameState
 activateSkill slot state
     | slot /= 1 = state
     | birdSkill bird == NoSkill = state
-    | gameRage state < rageMax = state          -- phải đầy nộ mới dùng được
-    | birdSkillDuration bird > 0 = state        -- skill đang chạy
+    | gameRage state < rageMax = state
+    | birdSkillDuration bird > 0 = state
     | otherwise = applySkill state
   where
     bird = gameBird state
@@ -505,7 +582,6 @@ activateSkill slot state
         max 1
             (3 - fromIntegral (max 0 (birdLevel bird - 1)) * 0.1)
 
-    -- Số giây còn lại của màn boss đang diễn ra (0 nếu không có boss).
     bossRemaining =
         case gameBoss state of
             Just b | bossActive b -> bossTimeLeft b
@@ -514,12 +590,9 @@ activateSkill slot state
     duration =
         case birdSkill bird of
             Invisibility -> 3
-            -- Dùng trong lúc đánh boss thì nam châm giữ nguyên tới khi boss
-            -- chết, rồi hút thêm 3 giây số xu rơi ra.
-            CoinMagnet   -> 3 + bossRemaining
-            _            -> baseDuration
+            CoinMagnet -> 3 + bossRemaining
+            _ -> baseDuration
 
-    -- Nộ thay thế cooldown: dùng xong nộ về 0 và phải vượt 5 cột để đầy lại.
     cooldown = 0
 
     applySkill s =
@@ -532,15 +605,24 @@ activateSkill slot state
 
             effects' =
                 case birdSkill b of
-                    PassThroughPipe -> PipePassEffect duration : gameEffects s
-                    SlowTime        -> SlowEffect duration : gameEffects s
-                    _               -> gameEffects s
+                    PassThroughPipe ->
+                        PipePassEffect duration : gameEffects s
+
+                    SlowTime ->
+                        SlowEffect duration : gameEffects s
+
+                    _ ->
+                        gameEffects s
 
             pipes' =
                 case birdSkill b of
-                    DestroyNextPipe -> PS.destroyNearestPipe
-                        (birdX b) (gamePipes s)
-                    _ -> gamePipes s
+                    DestroyNextPipe ->
+                        PS.destroyNearestPipe
+                            (birdX b)
+                            (gamePipes s)
+
+                    _ ->
+                        gamePipes s
 
         in s
             { gameBird = b'
@@ -568,7 +650,7 @@ tickEffects dt = foldr tick []
 
             PipePassEffect t | t > dt ->
                 PipePassEffect (t - dt) : rest
-            
+
             WindCurseEffect t | t > dt ->
                 WindCurseEffect (t - dt) : rest
 
@@ -586,25 +668,31 @@ isShieldEffect :: ActiveEffect -> Bool
 isShieldEffect (ShieldEffect t) = t > 0
 isShieldEffect _ = False
 
-
 tryRevive :: GameState -> GameState
 tryRevive state
-    | birdSkill bird == ReviveOnce && not (birdReviveUsed bird) =
-        state { gameBird = reviveBird (gameParams state) bird }
+    | birdSkill bird == ReviveOnce
+        && not (birdReviveUsed bird) =
+            state
+                { gameBird =
+                    reviveBird (gameParams state) bird
+                }
+
     | otherwise = state
   where
     bird = gameBird state
 
--- ===========================================================================
+-- ============================================================
 -- BOSS
--- ===========================================================================
+-- GIU NGUYEN CO CHE PHUN CAU LUA
+-- ============================================================
 
 bossInterval :: Int
 bossInterval = 10
 
--- | Vòng 1 = 5 giây, mỗi vòng sau cộng thêm 3 giây.
+-- Vong dau 5 giay, moi vong sau tang 3 giay.
 bossDuration :: Int -> Float
-bossDuration roundNo = 5 + 3 * fromIntegral (max 0 (roundNo - 1))
+bossDuration roundNo =
+    5 + 3 * fromIntegral (max 0 (roundNo - 1))
 
 bossFireInterval :: Float
 bossFireInterval = 1.0
@@ -618,49 +706,61 @@ newBoss roundNo = Boss
     , bossRound = roundNo
     , bossTimeLeft = bossDuration roundNo
     , bossTotalTime = bossDuration roundNo
-    , bossFireCooldown = 0.8          -- cho người chơi ~0.8s chuẩn bị
+    , bossFireCooldown = 0.8
     }
 
 updateBackgroundAndBoss :: Float -> GameState -> GameState
 updateBackgroundAndBoss dt state0 =
-    let background = case stName (stageForScore (gameScore state0)) of
-            "desert"  -> Desert
-            "ice"     -> IceWorld
-            "space"   -> SpaceWorld
-            "volcano" -> Volcano
-            _         -> Forest
+    let background =
+            case stName (stageForScore (gameScore state0)) of
+                "desert"  -> Desert
+                "ice"     -> IceWorld
+                "space"   -> SpaceWorld
+                "volcano" -> Volcano
+                _         -> Forest
 
-        state = state0 { gameBackground = background }
+        state =
+            state0 { gameBackground = background }
+
     in if gameStatus state == GameOver
         then state
         else case gameBoss state of
-            Nothing -> maybeStartBoss state
-            Just boss
-                | bossActive boss -> updateBoss dt state boss
-                | otherwise       -> state { gameBoss = Nothing }
+            Nothing ->
+                maybeStartBoss state
 
--- | Qua mốc 10, 20, 30... điểm thì dọn sân và gọi boss ra.
+            Just boss
+                | bossActive boss ->
+                    updateBoss dt state boss
+
+                | otherwise ->
+                    state { gameBoss = Nothing }
+
+-- Boss xuat hien tai cac moc 10, 20, 30... diem.
 maybeStartBoss :: GameState -> GameState
 maybeStartBoss state
     | score > 0
         && score `div` bossInterval
             > gameLastBossScore state `div` bossInterval =
         state
-            { gameBoss = Just (newBoss (score `div` bossInterval))
+            { gameBoss =
+                Just (newBoss (score `div` bossInterval))
             , gameLastBossScore = score
             , gamePipes = []
             , gameTraps = []
             , gameCoins = []
             , gameItems = []
             }
+
     | otherwise = state
   where
     score = gameScore state
 
--- | Mỗi tick: boss bay lên xuống, đếm ngược, phun lửa; hết giờ thì chết.
+-- Boss bay len xuong, dem gio va phun cau lua.
 updateBoss :: Float -> GameState -> Boss -> GameState
 updateBoss dt state boss
-    | timeLeft' <= 0 = defeatBoss state
+    | timeLeft' <= 0 =
+        defeatBoss state
+
     | otherwise =
         state
             { gameBoss = Just boss'
@@ -668,21 +768,33 @@ updateBoss dt state boss
             }
   where
     timeLeft' = bossTimeLeft boss - dt
-    elapsed   = bossTotalTime boss - timeLeft'
+    elapsed = bossTotalTime boss - timeLeft'
 
-    y' = screenHeight / 2 + 180 * sin (elapsed * 2)
+    y' =
+        screenHeight / 2 + 180 * sin (elapsed * 2)
 
-    cooldown0 = bossFireCooldown boss - dt
+    cooldown0 =
+        bossFireCooldown boss - dt
 
     (fireballs, cooldown')
         | cooldown0 <= 0 =
-            ( bossVolley (gameParams state) (bossRound boss)
-                (bossX boss) y' (round (timeLeft' * 1000))
-            , bossFireInterval )
-        | otherwise = ([], cooldown0)
+            ( bossVolley
+                (gameParams state)
+                (bossRound boss)
+                (bossX boss)
+                y'
+                (round (timeLeft' * 1000))
+            , bossFireInterval
+            )
 
-    healthPct = max 0 (min 100
-        (round (100 * timeLeft' / bossTotalTime boss)))
+        | otherwise =
+            ([], cooldown0)
+
+    healthPct =
+        max 0
+            (min 100
+                (round
+                    (100 * timeLeft' / bossTotalTime boss)))
 
     boss' = boss
         { bossY = y'
@@ -691,41 +803,56 @@ updateBoss dt state boss
         , bossFireCooldown = cooldown'
         }
 
--- | Một đợt lửa: 1 quả từ vị trí boss + vài quả ở độ cao ngẫu nhiên (tối đa 4).
+-- Mot dot cau lua tu boss.
 bossVolley :: Params -> Int -> Float -> Float -> Int -> [Trap]
 bossVolley params roundNo x bossY' seed =
-    [ Trap (x - 50) y radius Fireball True | y <- bossY' : extraYs ]
+    [ Trap (x - 50) y radius Fireball True
+    | y <- bossY' : extraYs
+    ]
   where
-    count   = min 4 (1 + roundNo)
-    radius  = realToFrac (fireballRadius params)
-    gen     = mkStdGen (seed * 7919 + roundNo * 104729)
-    extraYs = take (count - 1)
-                (randomRs (60, screenHeight - 60) gen) :: [Float]
+    count = min 4 (1 + roundNo)
 
--- | Sống sót đủ thời gian thì hạ boss, cộng 10 điểm và nhận 20 xu.
+    radius =
+        realToFrac (fireballRadius params)
+
+    gen =
+        mkStdGen (seed * 7919 + roundNo * 104729)
+
+    extraYs =
+        take (count - 1)
+            (randomRs (60, screenHeight - 60) gen)
+            :: [Float]
+
+-- Song sot het gio boss thi nhan 10 diem va 20 xu.
 defeatBoss :: GameState -> GameState
 defeatBoss state =
     state
         { gameBoss = Nothing
         , gameScore = gameScore state + 10
-        -- Cập nhật mốc boss, nếu không điểm +10 sẽ gọi boss kế tiếp ngay
-        -- và xóa sạch 20 xu thưởng.
-        , gameLastBossScore = gameScore state + 10
+
+        , gameLastBossScore =
+            gameScore state + 10
+
         , gameCoins = bossRewardCoins
+
         , gamePipes =
             PS.respawnPipes
                 (gameParams state)
                 (stageForScore (gameScore state))
                 (gameScore state)
+
         , gameTraps = []
         }
 
--- | 20 xu vàng xếp lưới 5 cột x 4 hàng, nằm trước cột đầu tiên.
+-- 20 xu thuong sau khi danh bai boss.
 bossRewardCoins :: [Coin]
 bossRewardCoins =
-    [ Coin (360 + fromIntegral col * 28)
-           (220 + fromIntegral row * 36)
-           9 GoldCoin False
+    [ Coin
+        (360 + fromIntegral col * 28)
+        (220 + fromIntegral row * 36)
+        9
+        GoldCoin
+        False
     | col <- [0 .. 4 :: Int]
     , row <- [0 .. 3 :: Int]
     ]

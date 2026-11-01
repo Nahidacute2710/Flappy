@@ -130,6 +130,14 @@ function toApiInput(input) {
   if (input === "Jump") return "Flap";
   return input;
 }
+
+
+function getPlayerName() {
+  const name = (localStorage.getItem('flappyPlayerName') || '').trim();
+  return name.slice(0, 20) || 'PLAYER';
+}
+
+
 const STEP_SECONDS = 1 / 60;
 
 
@@ -268,7 +276,38 @@ function ensureModePicker() {
     row.appendChild(btn);
   });
 
-  picker.append(question, row);
+  
+  const nameLabel = document.createElement('label');
+  nameLabel.textContent = 'Tên người chơi (không bắt buộc):';
+  nameLabel.style.cssText =
+    'color:#fff;font:600 13px sans-serif;';
+
+  const nameInput = document.createElement('input');
+  nameInput.id = 'playerNameInput';
+  nameInput.type = 'text';
+  nameInput.maxLength = 20;
+  nameInput.placeholder = 'Để trống = PLAYER';
+
+  const savedName = localStorage.getItem('flappyPlayerName') || '';
+  nameInput.value = savedName === 'PLAYER' ? '' : savedName;
+
+  nameInput.style.cssText =
+    'box-sizing:border-box;width:min(260px,100%);padding:9px 12px;' +
+    'border-radius:10px;border:1px solid #80eaff;background:#20245a;' +
+    'color:white;font:600 14px sans-serif;';
+
+  nameInput.addEventListener('input', () => {
+    const name = nameInput.value.trim().slice(0, 20) || 'PLAYER';
+    localStorage.setItem('flappyPlayerName', name);
+  });
+
+  nameInput.addEventListener('keydown', event => {
+    event.stopPropagation();
+  });
+
+  picker.append(question, row, nameLabel, nameInput);
+
+
   playButton.parentElement.insertBefore(picker, playButton);
   refreshModePicker();
   return picker;
@@ -384,8 +423,10 @@ async function sendInput(input) {
 
     const nextGame = await api('/game/step', {
       input: apiInput,
-      state: game
+      state: game,
+      playerName: getPlayerName()
     });
+
 
     // Lấy số xu tích lũy mà Haskell trả về.
     const nextGold = Number(
@@ -487,12 +528,10 @@ async function startOrRestart() {
     return;
   }
 
+  
   if (game.status === 'Ready') {
-    await sendInput('Start');
-
-    if (game?.status === 'Playing') {
-      overlay.classList.add('hidden');
-    }
+    overlay.classList.add('hidden');
+    drawScene();
   } else if (game.status === 'Paused') {
     await sendInput('Resume');
 
@@ -510,11 +549,20 @@ async function restartGame() {
   busy = true;
 
   try {
+    
     game = normalizeGameState(
-      await api('/game/restart', { bird: equippedBird, immortal: immortalMode }),
+      await api('/game/restart', {
+        bird: equippedBird,
+        immortal: immortalMode
+      }),
       0
     );
+
+    game.status = 'Ready';
+    game.gameStatus = 'Ready';
+
     updateHud();
+
     overlay.classList.add('hidden');
     particles = [];
     drawScene();

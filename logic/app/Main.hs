@@ -1,32 +1,41 @@
+
 {-# LANGUAGE OverloadedStrings #-}
+
 module Main (main) where
 
+import Control.Concurrent.MVar (newMVar, withMVar)
+import Control.DeepSeq (NFData, force)
+import Control.Exception (evaluate)
+import Control.Monad (when)
 import Control.Monad.IO.Class (liftIO)
 import System.Random (randomRIO)
+
 import ApiJSON ()
+import CommandParser (parseSimulationCommand, SimulationConfig(..))
 import Data.Aeson (FromJSON, ToJSON, object, (.=), (.:), (.:?), (.!=), withObject)
 import qualified Data.Aeson as Aeson
 import Data.Maybe (fromMaybe)
 import GameLoop (initialGameState, stepGame, timeStep)
 import GameState
-import Control.Monad (when)
+import GHC.Clock (getMonotonicTimeNSec)
+
 import Leaderboard
   ( LeaderboardEntry(..)
   , recordScore
   , getTop10
   )
+
 import Achievement
   ( getAchievementStats
   , recordFinishedGame
   )
-import Control.DeepSeq (NFData, force)
-import Control.Exception (evaluate)
-import GHC.Clock (getMonotonicTimeNSec)
+
 import Network.Wai.Middleware.Cors
   ( CorsResourcePolicy(..)
   , cors
   , simpleCorsResourcePolicy
   )
+
 import Simulation
   ( BossSimResult(..)
   , runParallel
@@ -34,14 +43,14 @@ import Simulation
   , runBossParallel
   , runBossSequential
   )
+
 import Web.Scotty
 
--- Accept the API request shape used by the frontend: {stepSeconds,input,state}.
--- stepSeconds is converted to a bounded number of the source game's fixed 1/60s ticks.
+-- Du lieu gui tu frontend khi cap nhat game.
 data StepRequest = StepRequest
-  { stepSeconds      :: Maybe Float
-  , requestInput     :: Input
-  , requestState     :: GameState
+  { stepSeconds       :: Maybe Float
+  , requestInput      :: Input
+  , requestState      :: GameState
   , requestPlayerName :: Maybe String
   }
 
@@ -51,12 +60,11 @@ instance FromJSON StepRequest where
     <*> o .: "input"
     <*> o .: "state"
     <*> o .:? "playerName"
-    
--- Body tùy chọn của /game/start và /game/restart: {"bird":"classic|neon|cyber"}.
--- Body rỗng {} vẫn hợp lệ (dùng chim classic).
+
+-- Cau hinh khi bat dau hoac choi lai.
 data StartRequest = StartRequest
-  { startBird :: Maybe String
-  , startImmortal :: Maybe Bool   -- true = chế độ bất tử (test)
+  { startBird     :: Maybe String
+  , startImmortal :: Maybe Bool
   }
 
 instance FromJSON StartRequest where
@@ -75,7 +83,7 @@ instance FromJSON BossSimRequest where
     <*> (o .:? "count" .!= 200)
 
 data SimulationRequest = SimulationRequest
-  { simulationCount :: Int
+  { simulationCount  :: Int
   , simulationFrames :: Int
   }
 
@@ -90,213 +98,320 @@ instance ToJSON SimulationRequest where
     , "framesPerScenario" .= simulationFrames req
     ]
 
+newtype SimulationCommandRequest =
+  SimulationCommandRequest
+    { commandText :: String
+    }
 
--- Tao trang thai moi voi Coin, Shield va WindCurse.
+instance FromJSON SimulationCommandRequest where
+  parseJSON = withObject "SimulationCommandRequest" $ \o ->
+    SimulationCommandRequest <$> o .: "command"
+
+-- Tao trang thai game voi Coin, Shield va WindCurse.
 newRandomGameState :: Maybe String -> Bool -> IO GameState
 newRandomGameState skin immortal = do
-    let base = initialGameState
-            { gameBird = birdForSkin (fromMaybe "classic" skin)
-            , gameImmortal = immortal
-            }
-        pipes = gamePipes base
-
-    coins <- mapM makeCoin pipes
-    shields <- mapM makeShield (filterEvenIndexed pipes)
-
-    let windPipes = drop 1 (filterEvenIndexed pipes)
-
-    windCurses <- mapM makeWindCurse windPipes
-
-    let items = shields ++ windCurses
-
-    return base
-        { gameCoins = coins
-        , gameItems = items
+  let base = initialGameState
+        { gameBird = birdForSkin (fromMaybe "classic" skin)
+        , gameImmortal = immortal
         }
+
+      pipes = gamePipes base
+
+  coins <- mapM makeCoin pipes
+  shields <- mapM makeShield (filterEvenIndexed pipes)
+
+  let windPipes = drop 1 (filterEvenIndexed pipes)
+
+  windCurses <- mapM makeWindCurse windPipes
+
+  let items = shields ++ windCurses
+
+  return base
+    { gameCoins = coins
+    , gameItems = items
+    }
 
   where
     makeCoin pipe = do
-        y <- randomY pipe
-        return $ Coin
-            (pipeX pipe + pipeWidth pipe / 2)
-            y
-            9
-            GoldCoin
-            False
+      y <- randomY pipe
+      return $ Coin
+        (pipeX pipe + pipeWidth pipe / 2)
+        y
+        9
+        GoldCoin
+        False
 
     makeShield pipe = do
-        y <- randomY pipe
-        return $ ItemPickup
-            (pipeX pipe + pipeWidth pipe / 2)
-            y
-            13
-            Shield
-            False
+      y <- randomY pipe
+      return $ ItemPickup
+        (pipeX pipe + pipeWidth pipe / 2)
+        y
+        13
+        Shield
+        False
 
     makeWindCurse pipe = do
-        y <- randomY pipe
-        return $ ItemPickup
-            (pipeX pipe + pipeWidth pipe / 2)
-            y
-            18
-            WindCurse
-            False
+      y <- randomY pipe
+      return $ ItemPickup
+        (pipeX pipe + pipeWidth pipe / 2)
+        y
+        18
+        WindCurse
+        False
 
     randomY pipe =
-        let top = pipeGapTop pipe
-            bottom = pipeGapBottom pipe
-            low = min (top + 20) (bottom - 20)
-            high = max (top + 20) (bottom - 20)
-        in randomRIO (low, high)
-        
-    filterEvenIndexed pipes =
-        [ pipe
-        | (index, pipe) <- zip [0 :: Int ..] pipes
-        , even index
-        ]
+      let top = pipeGapTop pipe
+          bottom = pipeGapBottom pipe
+          low = min (top + 20) (bottom - 20)
+          high = max (top + 20) (bottom - 20)
+      in randomRIO (low, high)
 
--- Đo thời gian chạy và buộc kết quả được tính đầy đủ.
+    filterEvenIndexed ps =
+      [ pipe
+      | (index, pipe) <- zip [0 :: Int ..] ps
+      , even index
+      ]
+
+-- Do thoi gian xu ly va danh gia ket qua day du.
 benchmark :: NFData a => IO a -> IO (a, Double)
 benchmark action = do
-    start <- getMonotonicTimeNSec
-    result <- action >>= evaluate . force
-    end <- getMonotonicTimeNSec
+  start <- getMonotonicTimeNSec
 
-    let elapsedMs =
-            fromIntegral (end - start) / 1000000.0
+  result <- action >>= evaluate . force
 
-    return (result, elapsedMs)
+  end <- getMonotonicTimeNSec
+
+  let elapsedMs =
+        fromIntegral (end - start) / 1000000.0
+
+  return (result, elapsedMs)
 
 main :: IO ()
-main = scotty 3000 $ do
-  middleware $ cors (const $ Just corsPolicy)
+main = do
 
-  get "/api/health" $ json (object
-    [ "ok" .= True
-    , "service" .= ("flappy-bird-haskell" :: String)
-    ])
-  get "/api/achievements" $ do
-    stats <- liftIO getAchievementStats
-    json stats
-  
-  get "/api/leaderboard" $ do
-    entries <- liftIO getTop10
+  -- Khoa dong bo dung chung cho cac request.
+  -- Bao ve viec doc va ghi diem, thanh tich.
+  persistenceLock <- newMVar ()
 
-    json $ object
-      [ "count" .= length entries
-      , "entries" .=
-          [ object
-              [ "rank"  .= rank
-              , "name"  .= playerName entry
-              , "score" .= playerScore entry
-              , "date"  .= playedAt entry
-              , "avatar" .=
-                  take 1 (playerName entry)
-              ]
-          | (rank, entry) <- zip [1 :: Int ..] entries
-          ]
-      ]
+  scotty 3000 $ do
 
-  post "/api/game/start" $ do
-    req <- jsonData
-    state <- liftIO (newRandomGameState (startBird req) (fromMaybe False (startImmortal req)))
-    json state
+    middleware $ cors (const $ Just corsPolicy)
 
-  post "/api/game/step" $ do
-    req <- jsonData
-    let seconds = max 0 (min 0.25 (fromMaybe timeStep (stepSeconds req)))
-        ticks = max 1 (min 15 (round (seconds / timeStep)))
-        firstState = stepGame (requestInput req) (requestState req)
-        finalState = foldl (\st _ -> stepGame NoInput st) firstState [2 .. ticks]
-    let wasGameOver =
-          gameStatus (requestState req) == GameOver
+    -- Kiem tra backend.
+    get "/api/health" $ do
+      json $ object
+        [ "ok" .= True
+        , "service" .= ("flappy-bird-haskell" :: String)
+        ]
 
-        isNowGameOver =
-          gameStatus finalState == GameOver
+    -- Lay thong ke thanh tich.
+    get "/api/achievements" $ do
+      stats <- liftIO $
+        withMVar persistenceLock (const getAchievementStats)
 
-    when (not wasGameOver && isNowGameOver) $ do
+      json stats
+
+    -- Lay bang xep hang.
+    get "/api/leaderboard" $ do
+      entries <- liftIO $
+        withMVar persistenceLock (const getTop10)
+
+      json $ object
+        [ "count" .= length entries
+        , "entries" .=
+            [ object
+                [ "rank" .= rank
+                , "name" .= playerName entry
+                , "score" .= playerScore entry
+                , "date" .= playedAt entry
+                , "avatar" .= take 1 (playerName entry)
+                ]
+            | (rank, entry) <- zip [1 :: Int ..] entries
+            ]
+        ]
+
+    -- Bat dau van choi moi.
+    post "/api/game/start" $ do
+      req <- jsonData
+
+      state <- liftIO $
+        newRandomGameState
+          (startBird req)
+          (fromMaybe False (startImmortal req))
+
+      json state
+
+    -- Cap nhat trang thai game.
+    post "/api/game/step" $ do
+      req <- jsonData
+
+      let seconds =
+            max 0 (min 0.25 (fromMaybe timeStep (stepSeconds req)))
+
+          ticks =
+            max 1 (min 15 (round (seconds / timeStep)))
+
+          firstState =
+            stepGame (requestInput req) (requestState req)
+
+          finalState =
+            foldl
+              (\st _ -> stepGame NoInput st)
+              firstState
+              [2 .. ticks]
+
+          wasGameOver =
+            gameStatus (requestState req) == GameOver
+
+          isNowGameOver =
+            gameStatus finalState == GameOver
+
+      -- Chi luu khi trang thai chuyen sang GameOver.
+      when (not wasGameOver && isNowGameOver) $ do
         let name = fromMaybe "PLAYER" (requestPlayerName req)
-        _ <- liftIO $ recordScore name (gameScore finalState)
-        _ <- liftIO $ recordFinishedGame (gameScore finalState)
-        pure ()
-    json finalState
 
+        liftIO $ withMVar persistenceLock $ const $ do
+          _ <- recordScore name (gameScore finalState)
+          _ <- recordFinishedGame (gameScore finalState)
+          pure ()
 
+      json finalState
 
-  post "/api/game/restart" $ do
-    req <- jsonData
-    state <- liftIO (newRandomGameState (startBird req) (fromMaybe False (startImmortal req)))
-    json (state { gameStatus = Playing })
+    -- Khoi dong lai van choi.
+    post "/api/game/restart" $ do
+      req <- jsonData
 
-  post "/api/simulation/run" $ do
-    req <- jsonData
+      state <- liftIO $
+        newRandomGameState
+          (startBird req)
+          (fromMaybe False (startImmortal req))
 
-    let count = max 0 (min 5000 (simulationCount req))
-        frames = max 0 (min 100000 (simulationFrames req))
+      json (state { gameStatus = Playing })
 
-    (sequentialResults, sequentialMs) <-
-      liftIO $ benchmark $ evaluate (runSequential count frames)
+    -- Doc lenh mo phong bang parser combinator.
+    post "/api/simulation/command" $ do
+      body <- jsonData :: ActionM Aeson.Value
 
-    (parallelResults, parallelMs) <-
-      liftIO $ benchmark $ evaluate (runParallel count frames)
+      case Aeson.fromJSON body :: Aeson.Result SimulationCommandRequest of
 
-    let speedup
-          | parallelMs > 0 = sequentialMs / parallelMs
-          | otherwise = 0
+        Aeson.Error err ->
+          json $ object
+            [ "ok" .= False
+            , "error" .= err
+            ]
 
-    json $ object
-      [ "mode" .= ("parallel" :: String)
-      , "count" .= count
-      , "framesPerScenario" .= frames
-      , "results" .= parallelResults
-      , "matchesSequential" .=
-          (parallelResults == sequentialResults)
-      , "benchmark" .= object
-          [ "sequentialMs" .= sequentialMs
-          , "parallelMs" .= parallelMs
-          , "speedup" .= speedup
-          ]
-      ]
+        Aeson.Success commandReq ->
+          case parseSimulationCommand (commandText commandReq) of
 
-  post "/api/boss/simulate" $ do
-    req <- jsonData
+            Left err ->
+              json $ object
+                [ "ok" .= False
+                , "error" .= err
+                ]
 
-    let roundNo = max 1 (min 20 (bossSimRound req))
-        count = max 0 (min 5000 (bossSimCount req))
+            Right cfg -> do
+              let simulationResult =
+                    if mode cfg == "parallel"
+                      then runParallel (runs cfg) (frames cfg)
+                      else runSequential (runs cfg) (frames cfg)
 
-    (sequentialResults, sequentialMs) <-
-      liftIO $ benchmark $ evaluate
-        (runBossSequential roundNo count)
+              (results, ms) <-
+                liftIO $ benchmark $ evaluate simulationResult
 
-    (parallelResults, parallelMs) <-
-      liftIO $ benchmark $ evaluate
-        (runBossParallel roundNo count)
+              json $ object
+                [ "ok" .= True
+                , "mode" .= mode cfg
+                , "count" .= runs cfg
+                , "framesPerScenario" .= frames cfg
+                , "elapsedMs" .= ms
+                , "results" .= results
+                ]
 
-    let survived =
-          length (filter bossSurvived parallelResults)
+    -- So sanh mo phong tuan tu va song song.
+    post "/api/simulation/run" $ do
+      req <- jsonData
 
-        speedup
-          | parallelMs > 0 = sequentialMs / parallelMs
-          | otherwise = 0
+      let count =
+            max 0 (min 5000 (simulationCount req))
 
-    json $ object
-      [ "mode" .= ("parallel" :: String)
-      , "round" .= roundNo
-      , "count" .= count
-      , "survived" .= survived
-      , "matchesSequential" .=
-          (parallelResults == sequentialResults)
-      , "benchmark" .= object
-          [ "sequentialMs" .= sequentialMs
-          , "parallelMs" .= parallelMs
-          , "speedup" .= speedup
-          ]
-      ]
-      
+          frameCount =
+            max 0 (min 100000 (simulationFrames req))
+
+      (sequentialResults, sequentialMs) <-
+        liftIO $ benchmark $ evaluate
+          (runSequential count frameCount)
+
+      (parallelResults, parallelMs) <-
+        liftIO $ benchmark $ evaluate
+          (runParallel count frameCount)
+
+      let speedup
+            | parallelMs > 0 = sequentialMs / parallelMs
+            | otherwise = 0
+
+      json $ object
+        [ "mode" .= ("parallel" :: String)
+        , "count" .= count
+        , "framesPerScenario" .= frameCount
+        , "results" .= parallelResults
+        , "matchesSequential" .=
+            (parallelResults == sequentialResults)
+        , "benchmark" .= object
+            [ "sequentialMs" .= sequentialMs
+            , "parallelMs" .= parallelMs
+            , "speedup" .= speedup
+            ]
+        ]
+
+    -- Mo phong boss bang xu ly song song.
+    post "/api/boss/simulate" $ do
+      req <- jsonData
+
+      let roundNo =
+            max 1 (min 20 (bossSimRound req))
+
+          count =
+            max 0 (min 5000 (bossSimCount req))
+
+      (sequentialResults, sequentialMs) <-
+        liftIO $ benchmark $ evaluate
+          (runBossSequential roundNo count)
+
+      (parallelResults, parallelMs) <-
+        liftIO $ benchmark $ evaluate
+          (runBossParallel roundNo count)
+
+      let survived =
+            length (filter bossSurvived parallelResults)
+
+          speedup
+            | parallelMs > 0 = sequentialMs / parallelMs
+            | otherwise = 0
+
+      json $ object
+        [ "mode" .= ("parallel" :: String)
+        , "round" .= roundNo
+        , "count" .= count
+        , "survived" .= survived
+        , "matchesSequential" .=
+            (parallelResults == sequentialResults)
+        , "benchmark" .= object
+            [ "sequentialMs" .= sequentialMs
+            , "parallelMs" .= parallelMs
+            , "speedup" .= speedup
+            ]
+        ]
+
+-- Cau hinh cho phep frontend ket noi backend.
 corsPolicy :: CorsResourcePolicy
 corsPolicy = simpleCorsResourcePolicy
   { corsOrigins = Just
-      (["http://localhost:5501", "http://127.0.0.1:5501", "http://localhost:5502"], False)
+      ( [ "http://localhost:5501"
+        , "http://127.0.0.1:5501"
+        , "http://localhost:5502"
+        ]
+      , False
+      )
   , corsMethods = ["GET", "POST", "OPTIONS"]
   , corsRequestHeaders = ["Content-Type", "Accept"]
   }
